@@ -16,9 +16,12 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+#include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include "esp_log.h"
 #include "driver/i2c.h"
+#include "kalmanfilter.hpp"
+
 //#include <cmath>
 
 
@@ -213,7 +216,7 @@ static esp_err_t i2c_master_init(void)
 }
 
 /// 主函数
-void app_main(void)
+extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "main starting ....");
     uint8_t data[2];
@@ -252,22 +255,22 @@ void app_main(void)
         gy = MPU6050_getGyroY();
         gz = MPU6050_getGyroZ();
         tempure = MPU6050_getTemp();
-        //pitch = atan(ax/az)*57.2958;
-        //roll = atan(ay/az)*57.2958;
-        //fpitch = pfilter.filter(pitch, gy);
-        //froll = rfilter.filter(roll, -gx);
+        pitch = atan(ax/az)*57.2958;
+        roll = atan(ay/az)*57.2958;
+        fpitch = pfilter.filter(pitch, gy);
+        froll = rfilter.filter(roll, -gx);
         count++;
         if(esp_log_timestamp() / 1000 != lasttime) {
             lasttime = esp_log_timestamp() / 1000;
-            printf("----------------Samples:%d \n", count);
             count = 0;
+            printf("----------------Samples:%d \n", count);
             printf("温度: (%4.2f)\n", tempure);
             printf("加速度:(%4.2f,%4.2f,%4.2f)\n", ax, ay, az);
             printf("陀螺仪:(%6.3f,%6.3f,%6.3f)\n", gx, gy, gz);
-            //printf(" Pitch:%6.3f ", pitch);
-            //printf(" Roll:%6.3f ", roll);
-            //printf(" FPitch:%6.3f ", fpitch);
-            //printf(" FRoll:%6.3f \n", froll);
+            printf(" Pitch:%6.3f \n", pitch);
+            printf(" Roll:%6.3f \n", roll);
+            printf(" FPitch:%6.3f \n", fpitch);
+            printf(" FRoll:%6.3f \n", froll);
         }
     }
 
