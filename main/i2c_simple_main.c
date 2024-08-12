@@ -20,9 +20,8 @@
 #include <stdio.h>
 #include "esp_log.h"
 #include "driver/i2c.h"
-#include "kalmanfilter.hpp"
-
-//#include <cmath>
+#include <math.h>
+//#include "kalmanfilter.h"
 
 
 static const char *TAG = "i2c-simple-example";
@@ -215,8 +214,90 @@ static esp_err_t i2c_master_init(void)
     return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
 
+//////////////////////卡尔曼
+typedef struct {
+    float gyro_y;
+    float angle;
+    float q_bias;
+    float angle_err;
+    float q_angle;
+    float q_gyro;
+    float r_angle;
+    float dt;
+    char c_0;
+    float pct_0, pct_1, e;
+    float k_0, k_1, t_0, t_1;
+    float pdot[4];
+    float pp[2][2];
+} Kalman;
+
+// 初始化函数，代替C++中的构造函数
+void Kalman_Init(Kalman *kalman, float dt) {
+    kalman->gyro_y = 0;
+    kalman->angle = 0;
+    kalman->q_bias = 0;
+    kalman->angle_err = 0;
+    kalman->q_angle = 0.1f;
+    kalman->q_gyro = 0.1f;
+    kalman->r_angle = 0.5f;
+    kalman->dt = dt; //0.005
+    kalman->c_0 = 1;
+    kalman->pct_0 = 0;
+    kalman->pct_1 = 0;
+    kalman->e = 0;
+    kalman->k_0 = 0;
+    kalman->k_1 = 0;
+    kalman->t_0 = 0;
+    kalman->t_1 = 0;
+    kalman->pdot[0] = 0;
+    kalman->pdot[1] = 0;
+    kalman->pdot[2] = 0;
+    kalman->pdot[3] = 0;
+    kalman->pp[0][0] = 1;
+    kalman->pp[0][1] = 0;
+    kalman->pp[1][0] = 0;
+    kalman->pp[1][1] = 1;
+}
+
+// 卡尔曼滤波函数
+float Kalman_Filter(Kalman *kalman, float accel, float gyro) {
+    kalman->angle += (gyro - kalman->q_bias) * kalman->dt;
+    kalman->angle_err = accel - kalman->angle;
+
+    kalman->pdot[0] = kalman->q_angle - kalman->pp[0][1] - kalman->pp[1][0];
+    kalman->pdot[1] = -kalman->pp[1][1];
+    kalman->pdot[2] = -kalman->pp[1][1];
+    kalman->pdot[3] = kalman->q_gyro;
+    kalman->pp[0][0] += kalman->pdot[0] * kalman->dt;
+    kalman->pp[0][1] += kalman->pdot[1] * kalman->dt;
+    kalman->pp[1][0] += kalman->pdot[2] * kalman->dt;
+    kalman->pp[1][1] += kalman->pdot[3] * kalman->dt;
+
+    kalman->pct_0 = kalman->c_0 * kalman->pp[0][0];
+    kalman->pct_1 = kalman->c_0 * kalman->pp[1][0];
+
+    kalman->e = kalman->r_angle + kalman->c_0 * kalman->pct_0;
+
+    kalman->k_0 = kalman->pct_0 / kalman->e;
+    kalman->k_1 = kalman->pct_1 / kalman->e;
+
+    kalman->t_0 = kalman->pct_0;
+    kalman->t_1 = kalman->c_0 * kalman->pp[0][1];
+
+    kalman->pp[0][0] -= kalman->k_0 * kalman->t_0;
+    kalman->pp[0][1] -= kalman->k_0 * kalman->t_1;
+    kalman->pp[1][0] -= kalman->k_1 * kalman->t_0;
+    kalman->pp[1][1] -= kalman->k_1 * kalman->t_1;
+
+    kalman->angle += kalman->k_0 * kalman->angle_err;
+    kalman->q_bias += kalman->k_1 * kalman->angle_err;
+    kalman->gyro_y = gyro - kalman->q_bias;
+    
+    return kalman->angle;
+}
+
 /// 主函数
-extern "C" void app_main(void)
+void app_main(void)
 {
     ESP_LOGI(TAG, "main starting ....");
     uint8_t data[2];
@@ -241,24 +322,30 @@ extern "C" void app_main(void)
     float pitch, roll;
     float fpitch, froll;
 
-    //KALMAN pfilter(0.005);
-    //KALMAN rfilter(0.005);
+    Kalman pfilter;
+    Kalman rfilter;
+    Kalman_Init(&pfilter, 0.005);
+    Kalman_Init(&rfilter, 0.005);
+
 
     uint32_t lasttime = 0;
     int count = 0;
 
     while(1) {
-        ax = -MPU6050_getAccX();
+        // 从IMU中读取 加速度和角速度和温度
+        ax = -MPU6050_getAccX(); //x轴加速度
         ay = -MPU6050_getAccY();
         az = -MPU6050_getAccZ();
-        gx = MPU6050_getGyroX();
+        gx = MPU6050_getGyroX(); //x轴角速度
         gy = MPU6050_getGyroY();
         gz = MPU6050_getGyroZ();
         tempure = MPU6050_getTemp();
-        pitch = atan(ax/az)*57.2958;
-        roll = atan(ay/az)*57.2958;
-        fpitch = pfilter.filter(pitch, gy);
-        froll = rfilter.filter(roll, -gx);
+        // 计算姿态
+        pitch = atan(ax/az)*57.2958;  //俯仰角 180/pi=57.2958
+        roll = atan(ay/az)*57.2958;  //翻滚角
+        fpitch = Kalman_Filter(&pfilter, pitch, gy);
+        froll = Kalman_Filter(&rfilter, roll, -gx);
+        // 打印输出
         count++;
         if(esp_log_timestamp() / 1000 != lasttime) {
             lasttime = esp_log_timestamp() / 1000;
