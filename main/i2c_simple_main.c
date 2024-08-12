@@ -21,7 +21,7 @@
 #include "esp_log.h"
 #include "driver/i2c.h"
 #include <math.h>
-#include "mpu6050.h"
+#include "mpu9250.h"
 #include "kalman_filter.h"
 
 static const char *TAG = "i2c-simple-example";
