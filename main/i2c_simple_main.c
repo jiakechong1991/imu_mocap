@@ -22,6 +22,8 @@
 #include "i2c_warp.h"
 #include "mpu6050.h"
 #include "kalman_filter.h"
+#include "wifi_warp.h"
+
 
 static const char *TAG = "i2c-simple-example";
 
@@ -29,20 +31,25 @@ static const char *TAG = "i2c-simple-example";
 void app_main(void)
 {
     ESP_LOGI(TAG, "main starting ....");
+    // device 初始化
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C-master initialized successfully!!!");
-
     MPU6050_init(TAG);
-	ESP_LOGI("mpu6050", "init success!!!");
+	ESP_LOGI(TAG, "imu init success!!!");
+    // wifi_init();
+    // ESP_LOGI(TAG, "wifi init success!!!");
 
+    /////全局变量区
+    // imu
     float ax,ay,az,gx,gy,gz,tempure;
     float pitch, roll;
     float fpitch, froll;
-
     Kalman pfilter;
     Kalman rfilter;
     Kalman_Init(&pfilter, 0.005);
     Kalman_Init(&rfilter, 0.005);
+    // wifi-udp init
+    // SockStr *socket_ins = udp_socket_init()
 
     uint32_t lasttime = 0;
     int count = 0;
@@ -76,10 +83,18 @@ void app_main(void)
             printf(" Roll:%6.3f \n", roll);
             printf(" FPitch:%6.3f \n", fpitch);
             printf(" FRoll:%6.3f \n", froll);
+            //udp_client_task(TAG, socket_ins)
         }
     }
 
-    //关闭I2C-master
+    // close I2C-master
     ESP_ERROR_CHECK(i2c_driver_delete(I2C_MASTER_NUM));
     ESP_LOGI(TAG, "I2C de-initialized successfully");
+    // close wifi
+    // if (sock != -1) {
+    //     shutdown(sock, 0);
+    //     close(sock);
+    //     ESP_LOGE(TAG, "Shutting down socket and restarting...");
+    // }
+
 }
