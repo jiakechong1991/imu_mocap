@@ -18,36 +18,22 @@
 */
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
-#include "esp_log.h"
-#include "driver/i2c.h"
 #include <math.h>
-#include "mpu9250.h"
+#include "i2c_warp.h"
+#include "mpu6050.h"
 #include "kalman_filter.h"
 
 static const char *TAG = "i2c-simple-example";
-
 
 /// 主函数
 void app_main(void)
 {
     ESP_LOGI(TAG, "main starting ....");
-    uint8_t data[2];
     ESP_ERROR_CHECK(i2c_master_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
+    ESP_LOGI(TAG, "I2C-master initialized successfully!!!");
 
-    /* Read the MPU9250 WHO_AM_I register, on power up the register should have the value 0x71 */
-    // 读取imu期间在 I2c注册的地址ID：目前我们是0x68，因为我们的AD0引脚是接GND
-    ESP_ERROR_CHECK(i2c_device_register_read(WHO_AM_I, data, 1));
-    ESP_LOGI(TAG, "WHO_AM_I = %X", data[0]);
-
-    /* Demonstrate writing by reseting the MPU9250 */
-    // ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_PWR_MGMT_1_REG_ADDR, 1 << MPU9250_RESET_BIT));
-
-    ESP_LOGI(TAG, "下面开始初始化imu，并持续数据输出\n");
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    MPU6050_init();
-	ESP_LOGI("mpu6050", "init success!");
+    MPU6050_init(TAG);
+	ESP_LOGI("mpu6050", "init success!!!");
 
     float ax,ay,az,gx,gy,gz,tempure;
     float pitch, roll;
@@ -58,24 +44,25 @@ void app_main(void)
     Kalman_Init(&pfilter, 0.005);
     Kalman_Init(&rfilter, 0.005);
 
-
     uint32_t lasttime = 0;
     int count = 0;
 
     while(1) {
-        // 从IMU中读取 加速度和角速度和温度
+        // 从IMU中读取原始数据：加速度/角速度/温度
         ax = -MPU6050_getAccX(); //x轴加速度
         ay = -MPU6050_getAccY();
         az = -MPU6050_getAccZ();
         gx = MPU6050_getGyroX(); //x轴角速度
         gy = MPU6050_getGyroY();
         gz = MPU6050_getGyroZ();
-        tempure = MPU6050_getTemp();
+        tempure = MPU6050_getTemp(); //温度
+
         // 计算姿态
         pitch = atan(ax/az)*57.2958;  //俯仰角 180/pi=57.2958
         roll = atan(ay/az)*57.2958;  //翻滚角
         fpitch = Kalman_Filter(&pfilter, pitch, gy);
         froll = Kalman_Filter(&rfilter, roll, -gx);
+        
         // 打印输出
         count++;
         if(esp_log_timestamp() / 1000 != lasttime) {
@@ -91,8 +78,6 @@ void app_main(void)
             printf(" FRoll:%6.3f \n", froll);
         }
     }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //关闭I2C-master
     ESP_ERROR_CHECK(i2c_driver_delete(I2C_MASTER_NUM));
