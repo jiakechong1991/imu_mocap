@@ -90,7 +90,7 @@ void app_main(void)
             printf("磁力计:(%6.3f,%6.3f,%6.3f)\n", mx, my, mz);
             printf(" Pitch:%6.3f \n", pitch);
             printf(" Roll:%6.3f \n", roll);
-            printf(" FPitch:%6.3f \n", fpitch);
+            printf(" FPitch:%6.3f \n", fpitch); 
             printf(" FRoll:%6.3f \n", froll);
             //udp_client_task(TAG, socket_ins)
         }

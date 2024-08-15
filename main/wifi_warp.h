@@ -74,7 +74,6 @@ static SockStr udp_socket_init(char *TAG)
     int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
     if (sock < 0) {
         ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
-        break;
     }
 
     // Set timeout
@@ -85,8 +84,8 @@ static SockStr udp_socket_init(char *TAG)
     ESP_LOGI(TAG, "Socket created, sending to %s:%d", HOST_IP_ADDR, PORT);
     SockStr socket_ins;
     socket_ins.sock = sock;
-    socket_ins.dest_addr = dest_addr
-    return socket_ins
+    socket_ins.dest_addr = dest_addr;
+    return socket_ins;
 }
 
 // udp-send msg
@@ -94,7 +93,8 @@ static void udp_client_write(char *TAG, SockStr *socket_ins)
 {   
     static const char *payload = "Message from ESP32 \n";
     // send msg
-    int err = sendto(socket_ins.sock, payload, strlen(payload), 0, (struct sockaddr *)&socket_ins.dest_addr, sizeof(socket_ins.dest_addr));
+    int err = sendto(socket_ins->sock, payload, strlen(payload), 0, 
+        (struct sockaddr *)&socket_ins->dest_addr, sizeof(socket_ins->dest_addr));
     if (err < 0) {
         ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
     }else{
@@ -109,13 +109,14 @@ char* udp_client_read(char *TAG, SockStr *socket_ins)
     char rx_buffer[128];
     struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
     socklen_t socklen = sizeof(source_addr);
-    int len = recvfrom(socket_ins.sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
+    int len = recvfrom(socket_ins->sock, rx_buffer, sizeof(rx_buffer) - 1, 0, 
+        (struct sockaddr *)&source_addr, &socklen);
 
     // Error occurred during receiving
     if (len < 0) {
         ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
-        
     }
+    
     else {  // Data received
         rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
         ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
