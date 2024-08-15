@@ -89,7 +89,7 @@ static SockStr udp_socket_init(char *TAG)
 }
 
 // udp-send msg
-static void udp_client_write(char *TAG, SockStr *socket_ins)
+static void udp_client_send(char *TAG, SockStr *socket_ins)
 {   
     static const char *payload = "Message from ESP32 \n";
     // send msg
@@ -116,7 +116,7 @@ char* udp_client_read(char *TAG, SockStr *socket_ins)
     if (len < 0) {
         ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
     }
-    
+
     else {  // Data received
         rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
         ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
