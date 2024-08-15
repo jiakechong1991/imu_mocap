@@ -1,18 +1,10 @@
 #pragma once
 #include "esp_log.h"
-#include "driver/i2c.h"
-
-////////////////////I2C master配置
-#define I2C_MASTER_SCL_IO           CONFIG_I2C_MASTER_SCL      /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           CONFIG_I2C_MASTER_SDA      /*!< GPIO number used for I2C master data  */
-#define I2C_MASTER_NUM              0                          /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
-#define I2C_MASTER_FREQ_HZ          400000                     /*!< I2C master clock frequency */
-#define I2C_MASTER_TX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_TIMEOUT_MS       1000
+#include "i2c_warp.h"
+#include "freertos/FreeRTOS.h"
 
 
-//////////////////MPU9250寄存器和预定义变量
+//////////////////MPU6050寄存器和预定义变量
 #define	SMPLRT_DIV		0x19	//陀螺仪采样率，典型值：0x07(125Hz)
 #define	CONFIG			0x1A	//低通滤波频率，典型值：0x06(5Hz)
 #define	GYRO_CONFIG		0x1B	//陀螺仪自检及测量范围，典型值：0x18(不自检，2000deg/s)
@@ -34,6 +26,7 @@
 #define	PWR_MGMT_1		0x6B	//电源管理，典型值：0x00(正常启用)
 #define	WHO_AM_I		0x75	//IIC地址寄存器(默认数值0x68，只读) Register addresses of the "who am I" register
 #define	MPU6050_ADDR	0x68	//Slave address of the MPU9250 sensor
+#define MAG_ADDRESS     0x0C
 
 /////MPU会使用到的常量
 #define ORIGINAL_OUTPUT			 (0)
@@ -66,53 +59,22 @@
 	#define GyroAxis_Sensitive (1)
 #endif
 
-/////////////////////////I2C通信--读写函数
-/**
- * @brief Read a sequence of bytes from a MPU9250 sensor registers
- * 从I2c从设备中，在指定寄存器上 读取值
- */
-static esp_err_t i2c_device_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
-{
-    return i2c_master_write_read_device(I2C_MASTER_NUM, MPU6050_ADDR, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-}
 
-/**
- * @brief Write a byte to a MPU9250 sensor register
- * 从I2C从设备中，在 指定寄存器 上 写入值
- */
-static esp_err_t i2c_device_register_write_byte(uint8_t reg_addr, uint8_t data)
-{
-    int ret;
-    uint8_t write_buf[2] = {reg_addr, data};
+typedef struct {
+    float ACC_X;
+    float ACC_Y;
+    float ACC_Z;
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, MPU6050_ADDR, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    float Gyro_X;
+    float Gyro_Y;
+    float Gyro_Z;
 
-    return ret;
-}
+    float Mag_X;
+    float Mag_Y;
+    float Mag_Z;
 
-/**
- * @brief i2c master initialization
- * I2C-master初始化
- */
-static esp_err_t i2c_master_init(void)
-{
-    int i2c_master_port = I2C_MASTER_NUM;
-
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
-    };
-
-    i2c_param_config(i2c_master_port, &conf);
-
-    return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
-}
-
-/////////////////////////////////IMU操作函数///////////////////////////////////////
+    float temputure;
+} IMUdata;
 
 /*
     MPU6050初始化步骤：
@@ -130,59 +92,60 @@ static esp_err_t i2c_master_init(void)
     6. 使能角速度传感器和加速度传感器：
         这两个操作通过电源管理寄存器 2（0X6C）来设置，设置对应位为 0 即可开启。
 */
-void MPU6050_init() {
-    // 电源重新上电
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(PWR_MGMT_1, 0x00));
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(SMPLRT_DIV, 0x07));
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(CONFIG      , 0x07));
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(GYRO_CONFIG , 0x18));
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(ACCEL_CONFIG, 0x01));
+void MPU6050_init(char *TAG) {
+    
+    // 读取imu期间在 I2c注册的地址ID：目前我们是0x68，因为我们的AD0引脚是接GND
+    uint8_t data[2];
+    // 读取who_am_i寄存器
+    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, WHO_AM_I, data, 1));
+    ESP_LOGI(TAG, "WHO_AM_I = %X", data[0]);
+
+    // 电源重新对imu上电
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, PWR_MGMT_1, 0x00));
+    vTaskDelay(100);
+    // 设置陀螺仪采样率
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, SMPLRT_DIV, 0x07));
+    // 设置低通滤波频率
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, CONFIG      , 0x07));
+    // 陀螺仪测量范围
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, GYRO_CONFIG , 0x18));
+    // 加速度技测量范围
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, ACCEL_CONFIG, 0x01));
 }
 
-float MPU6050_getAccX() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(ACCEL_XOUT_H, r, 2));
-    short accx = r[0] << 8 | r[1];
-    return (float)accx / AccAxis_Sensitive;
+
+void MPU9250::readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记 的数据
+{
+    uint8_t Buf[14];
+    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, 0x3B, Buf, 14);
+
+    // 加速度
+    short accx=(Buf[0]<<8 | Buf[1]);
+    imu_data.ACC_X = (float)accx / AccAxis_Sensitive;
+    short accy=(Buf[2]<<8 | Buf[3]);
+    imu_data.ACC_Y = (float)accy / AccAxis_Sensitive;
+    short accz=Buf[4]<<8 | Buf[5];
+    imu_data.ACC_Z = (float)accz / AccAxis_Sensitive
+    
+    //temputure
+    imu_data.temputure = (float) (Buf[6] << 8 | Buf[7]);
+
+    //陀螺仪
+    short gyrox=(Buf[8]<<8 | Buf[9]);
+    imu_data.Gyro_X = (float)gyrox / GyroAxis_Sensitive
+    short gyroy=(Buf[10]<<8 | Buf[11]);
+    imu_data.Gyro_Y = (float)gyroy / GyroAxis_Sensitive
+    short gyroz=(Buf[12]<<8 | Buf[13]);
+    imu_data.Gyro_Z = (float)gyroz / GyroAxis_Sensitive
+    
+    uint8_t rawData[6];  // x/y/z gyro calibration data stored here
+    I2CWriteByte(MPU6050_ADDR, 0x37, 0x02); // Power down magnetometer  
+    I2CWriteByte(MAG_ADDRESS, 0x0A, 0x01); // Enter Fuse ROM access mode
+    I2CRead(MAG_ADDRESS, 0x10, 3, rawData);
+    imu_data.Mag_X = (rawData[1]<<8 | rawData[0]);
+    imu_data.Mag_Y = (rawData[3]<<8 | rawData[2]);
+    imu_data.Mag_Z = (rawData[5]<<8 | rawData[4]);
+    I2CWriteByte(MAG_ADDRESS, 0x0A, 0x00); // Power down magnetometer  
+
 }
 
-float MPU6050_getAccY() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(ACCEL_YOUT_H, r, 2));
-    short accy = r[0] << 8 | r[1];
-    return (float)accy / AccAxis_Sensitive;
-}
-
-float MPU6050_getAccZ() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(ACCEL_ZOUT_H, r, 2));
-    short accz = r[0] << 8 | r[1];
-    return (float)accz / AccAxis_Sensitive;
-}
-
-float MPU6050_getGyroX() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(GYRO_XOUT_H, r, 2));
-    short gyrox = r[0] << 8 | r[1];
-    return (float)gyrox / GyroAxis_Sensitive;
-}
-
-float MPU6050_getGyroY() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(GYRO_YOUT_H, r, 2));
-    short gyroy = r[0] << 8 | r[1];
-    return (float)gyroy / GyroAxis_Sensitive;
-}
-
-float MPU6050_getGyroZ() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(GYRO_ZOUT_H, r, 2));
-    short gyroz = r[0] << 8 | r[1];
-    return (float)gyroz / GyroAxis_Sensitive;
-}
-
-short MPU6050_getTemp() {
-    uint8_t r[0];
-    ESP_ERROR_CHECK(i2c_device_register_read(TEMP_OUT_H, r, 2));
-    return r[0] << 8 | r[1];
-}

@@ -1,6 +1,8 @@
 #pragma once
 #include "esp_log.h"
 #include "i2c_warp.h"
+#include "freertos/FreeRTOS.h"
+
 
 
 //////////////////MPU6050寄存器和预定义变量
@@ -79,14 +81,20 @@ void MPU6050_init(char *TAG) {
     
     // 读取imu期间在 I2c注册的地址ID：目前我们是0x68，因为我们的AD0引脚是接GND
     uint8_t data[2];
+    // 读取who_am_i寄存器
     ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, WHO_AM_I, data, 1));
     ESP_LOGI(TAG, "WHO_AM_I = %X", data[0]);
 
     // 电源重新对imu上电
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, PWR_MGMT_1, 0x00));
+    vTaskDelay(100);
+    // 设置陀螺仪采样率
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, SMPLRT_DIV, 0x07));
+    // 设置低通滤波频率
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, CONFIG      , 0x07));
+    // 陀螺仪测量范围
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, GYRO_CONFIG , 0x18));
+    // 加速度技测量范围
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, ACCEL_CONFIG, 0x01));
 }
 
