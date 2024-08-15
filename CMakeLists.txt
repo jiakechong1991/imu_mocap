@@ -3,7 +3,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 #if("${IDF_TARGET}" STREQUAL "linux")
-#set(COMPONENTS main esp_netif lwip protocol_examples_tapif_io startup esp_hw_support esp_system nvs_flash)
+# set(EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/components/protocol_examples_tapif_io)
+# set(COMPONENTS main esp_driver_i2c  esp_netif lwip protocol_examples_tapif_io startup esp_hw_support esp_system nvs_flash)
 #endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

@@ -19,10 +19,11 @@
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <math.h>
+#include "driver/i2c.h"
 #include "i2c_warp.h"
-#include "mpu6050.h"
 #include "kalman_filter.h"
 #include "wifi_warp.h"
+#include "mpu9250.h"
 
 
 static const char *TAG = "i2c-simple-example";
@@ -34,18 +35,20 @@ void app_main(void)
     // device 初始化
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C-master initialized successfully!!!");
-    MPU6050_init(TAG);
+    MPU9250_init(TAG);
 	ESP_LOGI(TAG, "imu init success!!!");
     // wifi_init();
     // ESP_LOGI(TAG, "wifi init success!!!");
 
     /////全局变量区
     // imu
-    float ax,ay,az,gx,gy,gz,tempure;
+    float ax,ay,az,gx,gy,gz,tempure, mx,my,mz;
     float pitch, roll;
     float fpitch, froll;
     Kalman pfilter;
     Kalman rfilter;
+    IMUdata imu_data;
+
     Kalman_Init(&pfilter, 0.005);
     Kalman_Init(&rfilter, 0.005);
     // wifi-udp init
@@ -56,13 +59,18 @@ void app_main(void)
 
     while(1) {
         // 从IMU中读取原始数据：加速度/角速度/温度
-        ax = -MPU6050_getAccX(); //x轴加速度
-        ay = -MPU6050_getAccY();
-        az = -MPU6050_getAccZ();
-        gx = MPU6050_getGyroX(); //x轴角速度
-        gy = MPU6050_getGyroY();
-        gz = MPU6050_getGyroZ();
-        tempure = MPU6050_getTemp(); //温度
+        ax = -imu_data.ACC_X; //x轴加速度
+        ay = -imu_data.ACC_Y;
+        az = -imu_data.ACC_Z;
+        gx = imu_data.Gyro_X; //x轴角速度
+        gy = imu_data.Gyro_Y;
+        gz = imu_data.Gyro_Z;
+        mx = imu_data.Mag_X;
+        my = imu_data.Mag_Y;
+        mz = imu_data.Mag_Z;
+        tempure = imu_data.temputure; //温度
+
+        MPU9250_readAG_MG(&imu_data);
 
         // 计算姿态
         pitch = atan(ax/az)*57.2958;  //俯仰角 180/pi=57.2958
@@ -79,6 +87,7 @@ void app_main(void)
             printf("温度: (%4.2f)\n", tempure);
             printf("加速度:(%4.2f,%4.2f,%4.2f)\n", ax, ay, az);
             printf("陀螺仪:(%6.3f,%6.3f,%6.3f)\n", gx, gy, gz);
+            printf("磁力计:(%6.3f,%6.3f,%6.3f)\n", mx, my, mz);
             printf(" Pitch:%6.3f \n", pitch);
             printf(" Roll:%6.3f \n", roll);
             printf(" FPitch:%6.3f \n", fpitch);

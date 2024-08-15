@@ -92,7 +92,7 @@ typedef struct {
     6. 使能角速度传感器和加速度传感器：
         这两个操作通过电源管理寄存器 2（0X6C）来设置，设置对应位为 0 即可开启。
 */
-void MPU6050_init(char *TAG) {
+void MPU9250_init(char *TAG) {
     
     // 读取imu期间在 I2c注册的地址ID：目前我们是0x68，因为我们的AD0引脚是接GND
     uint8_t data[2];
@@ -102,7 +102,7 @@ void MPU6050_init(char *TAG) {
 
     // 电源重新对imu上电
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, PWR_MGMT_1, 0x00));
-    vTaskDelay(100);
+    //vTaskDelay(100);
     // 设置陀螺仪采样率
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, SMPLRT_DIV, 0x07));
     // 设置低通滤波频率
@@ -114,38 +114,39 @@ void MPU6050_init(char *TAG) {
 }
 
 
-void MPU9250::readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记 的数据
+void MPU9250_readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记 的数据
 {
     uint8_t Buf[14];
-    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, 0x3B, Buf, 14);
+    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, 0x3B, Buf, 14));
 
     // 加速度
     short accx=(Buf[0]<<8 | Buf[1]);
-    imu_data.ACC_X = (float)accx / AccAxis_Sensitive;
+    imu_data->ACC_X = (float)accx / AccAxis_Sensitive;
     short accy=(Buf[2]<<8 | Buf[3]);
-    imu_data.ACC_Y = (float)accy / AccAxis_Sensitive;
+    imu_data->ACC_Y = (float)accy / AccAxis_Sensitive;
     short accz=Buf[4]<<8 | Buf[5];
-    imu_data.ACC_Z = (float)accz / AccAxis_Sensitive
+    imu_data->ACC_Z = (float)accz / AccAxis_Sensitive;
     
     //temputure
-    imu_data.temputure = (float) (Buf[6] << 8 | Buf[7]);
+    imu_data->temputure = (float) (Buf[6] << 8 | Buf[7]);
 
     //陀螺仪
     short gyrox=(Buf[8]<<8 | Buf[9]);
-    imu_data.Gyro_X = (float)gyrox / GyroAxis_Sensitive
+    imu_data->Gyro_X = (float)gyrox / GyroAxis_Sensitive;
     short gyroy=(Buf[10]<<8 | Buf[11]);
-    imu_data.Gyro_Y = (float)gyroy / GyroAxis_Sensitive
+    imu_data->Gyro_Y = (float)gyroy / GyroAxis_Sensitive;
     short gyroz=(Buf[12]<<8 | Buf[13]);
-    imu_data.Gyro_Z = (float)gyroz / GyroAxis_Sensitive
+    imu_data->Gyro_Z = (float)gyroz / GyroAxis_Sensitive;
     
     uint8_t rawData[6];  // x/y/z gyro calibration data stored here
-    I2CWriteByte(MPU6050_ADDR, 0x37, 0x02); // Power down magnetometer  
-    I2CWriteByte(MAG_ADDRESS, 0x0A, 0x01); // Enter Fuse ROM access mode
-    I2CRead(MAG_ADDRESS, 0x10, 3, rawData);
-    imu_data.Mag_X = (rawData[1]<<8 | rawData[0]);
-    imu_data.Mag_Y = (rawData[3]<<8 | rawData[2]);
-    imu_data.Mag_Z = (rawData[5]<<8 | rawData[4]);
-    I2CWriteByte(MAG_ADDRESS, 0x0A, 0x00); // Power down magnetometer  
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, 0x37, 0x02)); // Power down magnetometer  
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MAG_ADDRESS, 0x0A, 0x01)); // Enter Fuse ROM access mode
+    ESP_ERROR_CHECK(i2c_device_register_read(MAG_ADDRESS, 0x10, rawData, 3));
+    imu_data->Mag_X = (rawData[1]<<8 | rawData[0]);
+    imu_data->Mag_Y = (rawData[3]<<8 | rawData[2]);
+    imu_data->Mag_Z = (rawData[5]<<8 | rawData[4]);
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MAG_ADDRESS, 0x0A, 0x00)); // Power down magnetometer  
 
 }
+
 
