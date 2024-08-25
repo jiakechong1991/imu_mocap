@@ -4,7 +4,7 @@
 #include "freertos/FreeRTOS.h"
 
 
-//////////////////MPU6050寄存器和预定义变量
+//////////////////MPU9250寄存器和预定义变量
 #define	SMPLRT_DIV		0x19	//陀螺仪采样率，典型值：0x07(125Hz)
 #define	CONFIG			0x1A	//低通滤波频率，典型值：0x06(5Hz)
 #define	GYRO_CONFIG		0x1B	//陀螺仪自检及测量范围，典型值：0x18(不自检，2000deg/s)
@@ -25,7 +25,7 @@
 #define	GYRO_ZOUT_L		0x48
 #define	PWR_MGMT_1		0x6B	//电源管理，典型值：0x00(正常启用)
 #define	WHO_AM_I		0x75	//IIC地址寄存器(默认数值0x68，只读) Register addresses of the "who am I" register
-#define	MPU6050_ADDR	0x68	//Slave address of the MPU9250 sensor
+#define	MPU9250_ADDR	0x68	//Slave address of the MPU9250 sensor
 #define MAG_ADDRESS     0x0C
 
 /////MPU会使用到的常量
@@ -97,27 +97,27 @@ void MPU9250_init(char *TAG) {
     // 读取imu期间在 I2c注册的地址ID：目前我们是0x68，因为我们的AD0引脚是接GND
     uint8_t data[2];
     // 读取who_am_i寄存器
-    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, WHO_AM_I, data, 1));
+    ESP_ERROR_CHECK(i2c_device_register_read(MPU9250_ADDR, WHO_AM_I, data, 1));
     ESP_LOGI(TAG, "WHO_AM_I = %X", data[0]);
 
     // 电源重新对imu上电
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, PWR_MGMT_1, 0x00));
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, PWR_MGMT_1, 0x00));
     //vTaskDelay(100);
     // 设置陀螺仪采样率
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, SMPLRT_DIV, 0x07));
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, SMPLRT_DIV, 0x07));
     // 设置低通滤波频率
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, CONFIG      , 0x07));
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, CONFIG      , 0x07));
     // 陀螺仪测量范围
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, GYRO_CONFIG , 0x18));
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, GYRO_CONFIG , 0x18));
     // 加速度技测量范围
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, ACCEL_CONFIG, 0x01));
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, ACCEL_CONFIG, 0x01));
 }
 
 
 void MPU9250_readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记 的数据
 {
     uint8_t Buf[14];
-    ESP_ERROR_CHECK(i2c_device_register_read(MPU6050_ADDR, 0x3B, Buf, 14));
+    ESP_ERROR_CHECK(i2c_device_register_read(MPU9250_ADDR, 0x3B, Buf, 14));
 
     // 加速度
     short accx=(Buf[0]<<8 | Buf[1]);
@@ -139,7 +139,7 @@ void MPU9250_readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记
     imu_data->Gyro_Z = (float)gyroz / GyroAxis_Sensitive;
     
     uint8_t rawData[6];  // x/y/z gyro calibration data stored here
-    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU6050_ADDR, 0x37, 0x02)); // Power down magnetometer  
+    ESP_ERROR_CHECK(i2c_device_register_write_byte(MPU9250_ADDR, 0x37, 0x02)); // Power down magnetometer  
     ESP_ERROR_CHECK(i2c_device_register_write_byte(MAG_ADDRESS, 0x0A, 0x01)); // Enter Fuse ROM access mode
     ESP_ERROR_CHECK(i2c_device_register_read(MAG_ADDRESS, 0x10, rawData, 3));
     imu_data->Mag_X = (rawData[1]<<8 | rawData[0]);

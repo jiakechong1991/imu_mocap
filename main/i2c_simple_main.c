@@ -37,7 +37,7 @@ void app_main(void)
     ESP_LOGI(TAG, "I2C-master initialized successfully!!!");
     MPU9250_init(TAG);
 	ESP_LOGI(TAG, "imu init success!!!");
-    wifi_init();
+    //wifi_init();
     ESP_LOGI(TAG, "wifi init success!!!");
 
     /////全局变量区
@@ -92,7 +92,7 @@ void app_main(void)
             printf(" Roll:%6.3f \n", roll);
             printf(" FPitch:%6.3f \n", fpitch); 
             printf(" FRoll:%6.3f \n", froll);
-            udp_client_send(TAG, &socket_ins);
+            //udp_client_send(TAG, &socket_ins);
         }
     }
 
@@ -100,10 +100,10 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_driver_delete(I2C_MASTER_NUM));
     ESP_LOGI(TAG, "I2C de-initialized successfully");
     // close wifi
-    if (socket_ins.sock != -1) {
-        shutdown(socket_ins.sock, 0);
-        close(socket_ins.sock);
-        ESP_LOGE(TAG, "Shutting down socket and restarting...");
-    }
+    // if (socket_ins.sock != -1) {
+    //     shutdown(socket_ins.sock, 0);
+    //     close(socket_ins.sock);
+    //     ESP_LOGE(TAG, "Shutting down socket and restarting...");
+    // }
 
 }
