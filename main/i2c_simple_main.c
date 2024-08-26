@@ -52,7 +52,7 @@ void app_main(void)
     Kalman_Init(&pfilter, 0.005);
     Kalman_Init(&rfilter, 0.005);
     // wifi-udp init
-    SockStr socket_ins = udp_socket_init(TAG);
+    //SockStr socket_ins = udp_socket_init(TAG);
 
     uint32_t lasttime = 0;
     int count = 0;

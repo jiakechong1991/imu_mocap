@@ -119,7 +119,7 @@ void MPU9250_readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记
     uint8_t Buf[14];
     ESP_ERROR_CHECK(i2c_device_register_read(MPU9250_ADDR, 0x3B, Buf, 14));
 
-    // 加速度
+    // 加速度 6个字节
     short accx=(Buf[0]<<8 | Buf[1]);
     imu_data->ACC_X = (float)accx / AccAxis_Sensitive;
     short accy=(Buf[2]<<8 | Buf[3]);
@@ -127,10 +127,10 @@ void MPU9250_readAG_MG(IMUdata *imu_data)  //读取加速度/陀螺仪/磁力记
     short accz=Buf[4]<<8 | Buf[5];
     imu_data->ACC_Z = (float)accz / AccAxis_Sensitive;
     
-    //temputure
+    //temputure 2字节
     imu_data->temputure = (float) (Buf[6] << 8 | Buf[7]);
 
-    //陀螺仪
+    //陀螺仪 6个字节
     short gyrox=(Buf[8]<<8 | Buf[9]);
     imu_data->Gyro_X = (float)gyrox / GyroAxis_Sensitive;
     short gyroy=(Buf[10]<<8 | Buf[11]);
